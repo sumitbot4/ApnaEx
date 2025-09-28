@@ -367,6 +367,3 @@ def encode_partial_url(url):
 
 
 
-    print("🤖 UG Extractor Bot is running...")
-
-    bot.run()
