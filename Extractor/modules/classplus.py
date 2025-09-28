@@ -60,15 +60,17 @@ async def classplus_txt(app, message):
             org_id = org_response["data"]["orgId"]
             org_name = org_response["data"]["orgName"]
     
-            # Step 3: Generate OTP (updated logic)
+            # Step 3: Generate OTP
             otp_payload = {
                 'countryExt': '91',
+                'orgCode': org_name,
                 'mobile': mobile,
                 'viaSms': 1,
                 'orgId': org_id,
-                'eventType': 'login'
+                'otpCount': 0
             }
             otp_response = s.post(f"{apiurl}/v2/otp/generate", json=otp_payload, headers=headers)
+
             print(otp_response)
     
             if otp_response.status_code == 200:
