@@ -22,48 +22,61 @@ apiurl = "https://api.classplusapp.com"
 s = requests.Session()
 
 def encode_partial_url(url):
-    """Encode latter half of URL"""
+    """Encode latter part of URL to handle special characters safely"""
     if not url:
         return ""
-    parsed = urlparse(url)
-    base = f"{parsed.scheme}://{parsed.netloc}"
-    path = url[len(base):]
-    encoded_path = base64.b64encode(path.encode()).decode()
-    return f"{base}{encoded_path}"
+    try:
+        parsed = urlparse(url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        path_part = url[len(base):]
+        encoded_path = base64.b64encode(path_part.encode()).decode()
+        return f"{base}{encoded_path}"
+    except Exception as e:
+        print(f"Error encoding URL: {e}")
+        return url
 
-async def fetch_course_content(session, course_id, folder_id=0, folder_path=""):
-    """Recursively fetch course content with encoded URLs"""
-    result = []
+async def fetch_course_content(session_obj, course_id, folder_id=0, folder_path=""):
+    """Recursively fetch course content (videos, PDFs, others)"""
+    results = []
     url = f"{apiurl}/v2/course/content/get?courseId={course_id}&folderId={folder_id}"
-    async with aiohttp.ClientSession() as aiosession:
-        async with aiosession.get(url, headers=session.headers) as resp:
-            j = await resp.json()
-            contents = j.get("data", {}).get("courseContent", [])
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(url, headers={
+                'x-access-token': session_obj.session_data['token'],
+                'user-agent': 'Mobile-Android',
+                'app-version': '1.4.65.3',
+                'api-version': '29',
+                'device-id': '39F093FF35F201D9'
+            }) as resp:
+                resp_json = await resp.json()
+                course_contents = resp_json.get("data", {}).get("courseContent", [])
+        except Exception as e:
+            print(f"Error fetching course content: {e}")
+            return []
 
     tasks = []
-    for item in contents:
-        ctype = str(item.get("contentType"))
+    for item in course_contents:
+        content_type = str(item.get("contentType"))
         sub_id = item.get("id")
         sub_name = item.get("name", "Untitled")
-        video_url = item.get("url", "")
+        url_link = item.get("url", "")
         content_hash = item.get("contentHashId", "")
 
-        if ctype in ("2", "3"):  # Video or PDF
-            if video_url:
-                encoded_url = encode_partial_url(video_url)
+        if content_type in ("2", "3"):  # Video or PDF
+            if url_link:
+                enc_url = encode_partial_url(url_link)
                 if content_hash:
-                    encoded_url += f"*UGxCP_hash={content_hash}\n"
-                result.append(f"{folder_path}{sub_name}: {encoded_url}")
-        elif ctype == "1":  # Folder
-            new_path = f"{folder_path}{sub_name} - "
-            tasks.append(fetch_course_content(session, course_id, sub_id, new_path))
+                    enc_url += f"*UGxCP_hash={content_hash}\n"
+                results.append(f"{folder_path}{sub_name}: {enc_url}")
+
+        elif content_type == "1":  # Folder
+            new_folder_path = f"{folder_path}{sub_name} - "
+            tasks.append(fetch_course_content(session_obj, course_id, sub_id, new_folder_path))
 
     sub_results = await asyncio.gather(*tasks)
-    for sub in sub_results:
-        result.extend(sub)
-
-    return result
-
+    for res in sub_results:
+        results.extend(res)
+    return results
 @app.on_message(filters.command(["cp"]))
 async def classplus_txt(app, message):
     """Main Bot Handler"""
@@ -80,9 +93,8 @@ async def classplus_txt(app, message):
     )
     await forward_to_log(details, "Classplus Extractor")
     user_input = details.text.strip()
-    user_id = None
 
-    if "*" in user_input:
+    if "*" in user_input:   # ORG + Mobile Login
         try:
             org_code, mobile = user_input.split("*")
             device_id = str(uuid.uuid4()).replace('-', '')
@@ -152,34 +164,35 @@ async def classplus_txt(app, message):
                                 await fetch_batches(app, message, org_name)
                             else:
                                 await message.reply("❌ No courses found")
+
     elif len(user_input) > 20:  # Direct Access Token
         token = user_input
-            s.headers['x-access-token'] = token
-            resp = s.get(f"{apiurl}/v2/courses?tabCategoryId=1", headers=s.headers)
-            if resp.status_code == 200:
-                courses = resp.json()["data"]["courses"]
-                s.session_data = {"token": token, "courses": {c["id"]: c["name"] for c in courses}}
+        s.headers['x-access-token'] = token
+        resp = s.get(f"{apiurl}/v2/courses?tabCategoryId=1", headers=s.headers)
+        if resp.status_code == 200:
+            courses = resp.json()["data"]["courses"]
+            s.session_data = {"token": token, "courses": {c["id"]: c["name"] for c in courses}}
 
-                org_name = None
-                for course in courses:
-                    link = course.get("shareableLink", "")
-                    if "courses.store" in link:
-                        org_code = link.split('.')[0].split('//')[-1]
-                        org_resp = s.get(f"{apiurl}/v2/orgs/{org_code}", headers=s.headers)
-                        if org_resp.status_code == 200:
-                            org_data = org_resp.json().get("data", {})
-                            org_name = org_data.get("orgName")
-                    else:
-                        try:
-                            org_name = link.split('//')[1].split('.')[1]
-                        except:
-                            org_name = "Unknown Org"
+            org_name = None
+            for course in courses:
+                link = course.get("shareableLink", "")
+                if "courses.store" in link:
+                    org_code = link.split('.')[0].split('//')[-1]
+                    org_resp = s.get(f"{apiurl}/v2/orgs/{org_code}", headers=s.headers)
+                    if org_resp.status_code == 200:
+                        org_data = org_resp.json().get("data", {})
+                        org_name = org_data.get("orgName")
+                else:
+                    try:
+                        org_name = link.split('//')[1].split('.')[1]
+                    except:
+                        org_name = "Unknown Org"
 
-                await fetch_batches(app, message, org_name)
-            else:
-                await message.reply("❌ Invalid token. Please try again.")
+            await fetch_batches(app, message, org_name)
         else:
-            await message.reply("❌ Invalid input format. Use ORG_CODE*Mobile or Access Token.")
+            await message.reply("❌ Invalid token. Please try again.")
+    else:
+        await message.reply("❌ Invalid input format. Use ORG_CODE*Mobile or Access Token.")
 
 
 async def fetch_batches(app, message, org_name):
@@ -217,8 +230,6 @@ async def fetch_batches(app, message, org_name):
             await app.send_message(message.chat.id, "❌ Invalid selection. Send correct index.")
     else:
         await app.send_message(message.chat.id, "❌ Invalid input. Send a number.")
-
-
 async def extract_batch(app, message, org_name, batch_id):
     """Fetch all content + live videos and save to text file"""
     session_data = s.session_data
@@ -256,7 +267,6 @@ async def extract_batch(app, message, org_name, batch_id):
                 print(f"Error fetching live videos: {e}")
         return outputs
 
-
     async def write_file(extracted_data):
         """Save extracted data to txt file safely"""
         invalid_chars = '\t:/+#|@*.'
@@ -265,7 +275,6 @@ async def extract_batch(app, message, org_name, batch_id):
         with open(path, "w", encoding='utf-8') as f:
             f.write('\n'.join(extracted_data))
         return path
-
 
     extracted_data, live_videos = await asyncio.gather(
         fetch_course_content(s, batch_id),
@@ -296,6 +305,7 @@ async def extract_batch(app, message, org_name, batch_id):
     await app.send_document(message.chat.id, file_path, caption=caption)
     await app.send_document(PREMIUM_LOGS, file_path, caption=caption)
     os.remove(file_path)
+
 
 async def fetch_course_content(session_obj, course_id, folder_id=0, folder_path=""):
     """Recursively fetch course content (videos, PDFs, others)"""
@@ -356,17 +366,6 @@ def encode_partial_url(url):
         return url
 
 
-# ----------------------- Bot Initialization ----------------------- #
-if __name__ == "__main__":
-    from pyrogram import Client
-    import asyncio
-
-    bot = Client(
-        "ExtractorBot",
-        api_id=os.getenv("API_ID"),
-        api_hash=os.getenv("API_HASH"),
-        bot_token=os.getenv("BOT_TOKEN")
-    )
 
     print("🤖 UG Extractor Bot is running...")
 
