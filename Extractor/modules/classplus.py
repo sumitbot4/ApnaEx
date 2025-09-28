@@ -63,7 +63,7 @@ async def classplus_txt(app, message):
             # Step 3: Generate OTP
             otp_payload = {
                 'countryExt': '91',
-                'orgCode': org_name,
+                'orgCode': org_code,
                 'mobile': mobile,
                 'viaSms': 1,
                 'orgId': org_id,
