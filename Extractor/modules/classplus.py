@@ -1,4 +1,4 @@
-# -------------------- Part 1/3 --------------------
+# -------------------- Full Classplus Extractor Bot --------------------
 import requests
 import json
 import uuid
@@ -14,10 +14,12 @@ from Extractor.core.utils import forward_to_log
 from datetime import datetime
 import pytz
 
+# -------------------- Timezone Setup --------------------
 india_timezone = pytz.timezone('Asia/Kolkata')
 current_time = datetime.now(india_timezone)
 time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 
+# -------------------- API & Session --------------------
 apiurl = "https://api.classplusapp.com/v2"
 s = requests.Session()
 
@@ -57,10 +59,10 @@ def get_course_content(session, course_id, folder_id=0, folder_path=""):
                         encoded_url += f"*UGxCP_hash={content_hash}\n"
                     fetched_contents.append(f"{folder_path}{name}: {encoded_url}")
     return fetched_contents
-# -------------------- Part 2/3 --------------------
+
+# -------------------- Pyrogram Command --------------------
 @app.on_message(filters.command(["cp"]))
 async def classplus_txt(app, message):
-    # Step 1: Ask for credentials
     details = await app.ask(
         message.chat.id,
         "🔹 <b>UG EXTRACTOR PRO</b> 🔹\n\n"
@@ -74,6 +76,7 @@ async def classplus_txt(app, message):
     await forward_to_log(details, "Classplus Extractor")
     user_input = details.text.strip()
 
+    # -------------------- OrgCode + Mobile Login --------------------
     if "*" in user_input:
         try:
             org_code, mobile = user_input.split("*")
@@ -87,34 +90,34 @@ async def classplus_txt(app, message):
                 "device-id": device_id
             }
 
-            # Step 2: Fetch Org details
+            # Fetch organization details
             org_resp = s.get(f"{apiurl}/orgs/{org_code}", headers=headers).json()
             org_id = org_resp["data"]["orgId"]
             org_name = org_resp["data"]["orgName"]
 
-            # Step 3: Generate OTP
+            # Generate OTP
             otp_payload = {
                 "countryExt": "91",
                 "mobile": mobile,
                 "viaSms": 1,
                 "orgId": org_id,
                 "eventType": "login",
-                "otpHash": "j7ej6eW5VO"  # same working hash from your working code
+                "otpHash": "j7ej6eW5VO"
             }
             otp_resp = s.post(f"{apiurl}/otp/generate", data=json.dumps(otp_payload), headers=headers)
             if otp_resp.status_code != 200:
-                await message.reply("❌ Failed to generate OTP. Please check your details.")
+                await message.reply("❌ Failed to generate OTP. Check your details.")
                 return
             session_id = otp_resp.json()['data']['sessionId']
 
-            # Step 4: Ask user for OTP
+            # Ask for OTP
             user_otp = await app.ask(message.chat.id, "📱 Enter OTP sent to your mobile:", timeout=300)
             otp = user_otp.text.strip()
             if not otp.isdigit():
                 await message.reply("❌ Invalid OTP. Enter numbers only.")
                 return
 
-            # Step 5: Verify OTP
+            # Verify OTP
             fingerprint_id = str(uuid.uuid4()).replace("-", "")
             verify_payload = {
                 "otp": otp,
@@ -132,18 +135,39 @@ async def classplus_txt(app, message):
             token = verify_resp.json()['data']['token']
             s.headers['x-access-token'] = token
             await message.reply_text(f"✅ Login Successful!\nAccess Token:\n<code>{token}</code>")
-            
-            # Step 6: Fetch courses
+
+            # Fetch courses
             headers['x-access-token'] = token
             course_resp = s.get(f"{apiurl}/v2/courses?tabCategoryId=1", headers=headers)
             if course_resp.status_code == 200:
                 courses = course_resp.json()["data"]["courses"]
-                s.session_data = {"token": token, "courses": {c["id"]: c["name"] for c in courses}}
+                # store courses as dict {course_id: course_name}
+                s.session_data = {"token": token, "courses": {str(c["id"]): c["name"] for c in courses}}
                 await fetch_batches(app, message, org_name)
             else:
                 await message.reply("❌ No courses found.")
+
         except Exception as e:
             await message.reply(f"❌ Error: {str(e)}")
+
+    # -------------------- Direct Token Login --------------------
+    else:
+        token = user_input
+        s.headers['x-access-token'] = token
+        res = s.get(f"{apiurl}/users/details")
+        data = res.json()
+        if isinstance(data, dict) and 'data' in data and 'responseData' in data['data']:
+            user_id = data['data']['responseData']['user']['id']
+        else:
+            await message.reply("❌ Failed to get user details. Check token.")
+            return
+
+        # Fetch courses
+        params = {'userId': user_id, 'tabCategoryId': 3}
+        course_resp = s.get(f"{apiurl}/profiles/users/data", params=params)
+        courses = course_resp.json()['data']['responseData']['coursesData']
+        s.session_data = {"token": token, "courses": {str(c["id"]): c["name"] for c in courses}}
+        await fetch_batches(app, message, "Direct Token Login")
 # -------------------- Part 3/3 --------------------
 async def fetch_batches(app, message, org_name):
     session_data = s.session_data
@@ -198,15 +222,6 @@ async def extract_batch(app, message, org_name, batch_id):
         'api-version': '35',
         'device-id': '39F093FF35F201D9'
     }
-
-    def encode_partial_url(url):
-        if not url:
-            return ""
-        parsed = urlparse(url)
-        base_part = f"{parsed.scheme}://{parsed.netloc}"
-        path_part = url[len(base_part):]
-        encoded_path = base64.b64encode(path_part.encode()).decode()
-        return f"{base_part}{encoded_path}"
 
     async def fetch_live_videos(course_id):
         outputs = []
