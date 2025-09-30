@@ -16,14 +16,14 @@ BOT_TEXT = "𝗨 𝗚 ♡ Exᴛʀᴀᴄᴛᴏʀ"
 OWNER_ID = int(os.environ.get("OWNER_ID", "7445620075"))
 # ------------------------------------------------
 # //LOG CHANNEL ID 
-CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1003104845508"))
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1002627220799"))
 
 # //FORCE_CHANNEL_ID
-CHANNEL_ID2 = int(os.environ.get("CHANNEL_ID2", "-1002471859014")) 
+CHANNEL_ID2 = int(os.environ.get("CHANNEL_ID2", "-1002627220799")) 
 # ------------------------------------------------
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb+srv://ankush23:JYzSGlbjpFezDSWH@cluster0.ulzzd1m.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 # -----------------------------------------------
-WITHOUT_LOGS = int(os.environ.get("WITHOUT_LOGS", "-1003144196590"))
+WITHOUT_LOGS = int(os.environ.get("WITHOUT_LOGS", "-1002627220799"))
 PREMIUM_LOGS = WITHOUT_LOGS
 # -----------------------------------------------
 join = '<a href="https://t.me/Studentzzzbot"> Nikhil ♡ Exᴛʀᴀᴄᴛᴏʀ </a>'
