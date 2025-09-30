@@ -19,6 +19,4 @@ tqdm
 colorama
 termcolor
 dotenv
-flask
-pyrogram
-tgcrypto
+
