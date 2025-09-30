@@ -1,27 +1,8 @@
 import asyncio
 import importlib
 import signal
-import os
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pyrogram import idle
 from Extractor.modules import ALL_MODULES
-
-# --- Dummy web server for Render port binding ---
-class Handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Bot is running!")
-
-def run_web():
-    port = int(os.getenv("PORT", 8080))  # Render provides PORT
-    server = HTTPServer(("0.0.0.0", port), Handler)
-    print(f"Web server running on port {port}")
-    server.serve_forever()
-
-threading.Thread(target=run_web, daemon=True).start()
-# ---------------------------------------------------------
 
 loop = asyncio.get_event_loop()
 
