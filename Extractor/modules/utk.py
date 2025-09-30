@@ -102,7 +102,7 @@ def decrypt(enc):
     b = plaintext.decode('utf-8')
     return b
 
-@app.on_message(filters.command(["utkarsh", "utk", "utk_dl"]))  # Added more handlers
+@app.on_message(filters.command([ "utk_dl"]))  # Added more handlers
 async def handle_utk_logic(app, m):
     session_manager = SessionManager(app)
     start_time = time.time()

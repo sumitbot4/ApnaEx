@@ -172,7 +172,7 @@ async def process_video(session, api_base, bi, si, sn, ti, tn, video, hdr1):
             
             
 THREADPOOL = ThreadPoolExecutor(max_workers=1000)
-@app.on_message(filters.command(["appx"]))
+@app.on_message(filters.command(["appxug"]))
 
 async def appex_v4_txt(app, message):
     THREADPOOL = ThreadPoolExecutor(max_workers=1000)

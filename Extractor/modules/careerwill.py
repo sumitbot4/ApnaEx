@@ -170,7 +170,7 @@ async def careerdl(app, message, headers, raw_text2, token, raw_text3, prog, nam
             os.remove(thumb_path)
 
 # -------------------- Main Command Handler ---------------------
-@app.on_message(filters.command("ugcw") & filters.private)
+@app.on_message(filters.command("ugxcw") & filters.private)
 async def career_will(app: Client, message: Message):
     try:
         welcome_msg = (

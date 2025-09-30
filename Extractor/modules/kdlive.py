@@ -29,7 +29,7 @@ india_timezone = pytz.timezone('Asia/Kolkata')
 current_time = datetime.now(india_timezone)
 time_new = current_time.strftime("%d-%m-%Y %I:%M %p")
 
-@app.on_message(filters.command(["kd"]))
+@app.on_message(filters.command(["kdug"]))
 async def kdlive(app, m):
     try:
         appname = 'KD Campus'
